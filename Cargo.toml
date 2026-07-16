@@ -1,0 +1,28 @@
+[package]
+name = "rust_flipit"
+version = "1.3.0"
+edition = "2021"
+description = "FlipIt Screensaver - Rust port using windows-rs"
+license = "CC0-1.0"
+
+[dependencies]
+windows = { version = "0.60", features = [
+    "Win32_Graphics_GdiPlus",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Foundation",
+    "Win32_System_LibraryLoader",
+] }
+chrono = "0.4"
+
+[build-dependencies]
+winresource = "0.1.31"
+
+[profile.release]
+opt-level = 2
+lto = true
+strip = "symbols"
+
+[[bin]]
+name = "rust_flipit"
+path = "src/main.rs"

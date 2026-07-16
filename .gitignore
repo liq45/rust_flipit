@@ -1,0 +1,6 @@
+/target
+*.scr
+*.exe
+*.res
+res/app.res
+res/app.rc
