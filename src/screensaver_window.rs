@@ -24,7 +24,7 @@ impl ScreensaverWindow {
     pub fn run_fullscreen(settings: &FlipItSettings) {
         unsafe {
             GFX_SCALE = settings.scale;
-            FONT_COLOR_ARGB = ((settings.font_alpha as u32) << 24) | (settings.font_color & 0xffffff);
+            FONT_COLOR_ARGB = settings.font_color;
             let sw = GetSystemMetrics(SM_CXSCREEN);
             let sh = GetSystemMetrics(SM_CYSCREEN);
             let monitors = vec![(0, 0, sw, sh)];
@@ -65,7 +65,7 @@ impl ScreensaverWindow {
     pub fn run_preview(_settings: &FlipItSettings, parent_hwnd: isize) {
         unsafe {
             GFX_SCALE = _settings.scale;
-            FONT_COLOR_ARGB = ((_settings.font_alpha as u32) << 24) | (_settings.font_color & 0xffffff);
+            FONT_COLOR_ARGB = _settings.font_color;
             let hinst = GetModuleHandleW(PCWSTR::null()).unwrap_or_default();
             let hinstance: HINSTANCE = hinst.into();
             let cls = register_preview_class(hinstance);

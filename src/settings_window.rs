@@ -30,14 +30,7 @@ const IDC_LOCATIONS: i32 = 1009;
 const IDC_CITY: i32 = 1010;
 const IDC_ADD: i32 = 1011;
 const IDC_REMOVE: i32 = 1012;
-const IDC_FONT_COLOR0: i32 = 1020;
-const IDC_FONT_COLOR1: i32 = 1021;
-const IDC_FONT_COLOR2: i32 = 1022;
-const IDC_FONT_COLOR3: i32 = 1023;
-const IDC_FONT_COLOR4: i32 = 1024;
-const IDC_FONT_COLOR5: i32 = 1025;
-const IDC_FONT_COLOR6: i32 = 1026;
-const IDC_FONT_ALPHA: i32 = 1027;
+const IDC_FONT_COLOR: i32 = 1020;
 
 pub fn run_settings(settings: &mut FlipItSettings) {
     unsafe {
@@ -171,46 +164,39 @@ unsafe fn create_controls(hwnd: HWND, settings: &FlipItSettings) {
     mk_btn(hwnd, hi, 465, 296, 90, 28, "Remove", 0x10000, IDC_REMOVE);
     mk_btn(hwnd, hi, 465, 390, 90, 28, "Add", 0x10000, IDC_ADD);
 
-    // Font color & transparency – placed above GitHub link
-    mk_static(hwnd, hi, 43, 420, 130, 17, "Font Color:");
-    let color_btns: [(u32, &str, i32); 7] = [
-        (0x00b7b7b7, "Def", IDC_FONT_COLOR0), (0x00ffffff, "Wht", IDC_FONT_COLOR1),
-        (0x0000ff00, "Grn", IDC_FONT_COLOR2), (0x000000ff, "Red", IDC_FONT_COLOR3),
-        (0x00ff0000, "Blu", IDC_FONT_COLOR4), (0x00ffff00, "Cyn", IDC_FONT_COLOR5),
-        (0x00808080, "Gry", IDC_FONT_COLOR6),
-    ];
-    for (i, &(_bgr, label, btn_id)) in color_btns.iter().enumerate() {
-        let (row, col) = (i / 4, i % 4);
-        let bx = 43 + (col as i32) * 48;
-        let by = 440 + (row as i32) * 26;
-        let hb = CreateWindowExW(WINDOW_EX_STYLE(0), &HSTRING::from("BUTTON"), &HSTRING::from(label),
-            WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0), bx, by, 44, 22,
-            Some(hwnd), Some(HMENU(btn_id as _)), Some(HINSTANCE(hi.0)), None,
-        ).unwrap_or_default();
-        let bf = CreateFontW(11, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET,
-            FONT_OUTPUT_PRECISION(OUT_TT_ONLY_PRECIS.0), FONT_CLIP_PRECISION(CLIP_DEFAULT_PRECIS.0),
-            FONT_QUALITY(CLEARTYPE_QUALITY.0), 0, &HSTRING::from("Segoe UI"));
-        if !bf.0.is_null() { SendMessageW(hb, 0x30, Some(WPARAM(bf.0 as usize)), None); }
-    }
-    mk_static(hwnd, hi, 43, 498, 130, 17, "Transparency:");
-    let ha = CreateWindowExW(WINDOW_EX_STYLE(0), &HSTRING::from("msctls_trackbar32"), &HSTRING::new(),
-        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0), 150, 496, 200, 30,
-        Some(hwnd), Some(HMENU(IDC_FONT_ALPHA as _)), Some(HINSTANCE(hi.0)), None,
+    // Font color – hex input box
+    mk_static(hwnd, hi, 43, 420, 48, 17, "Color:");
+    CreateWindowExW(
+        WS_EX_CLIENTEDGE, &HSTRING::from("EDIT"), &HSTRING::new(),
+        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | 0x800000 | 0x10000),
+        92, 417, 100, 22, Some(hwnd), Some(HMENU(IDC_FONT_COLOR as _)), Some(HINSTANCE(hi.0)), None,
     ).unwrap_or_default();
-    SendMessageW(ha, 0x416, Some(WPARAM(0)), None);
-    SendMessageW(ha, 0x417, None, Some(LPARAM(10)));
-    SendMessageW(ha, 0x415, Some(WPARAM(1)), Some(LPARAM((settings.font_alpha / 25) as isize)));
+    // Set initial text to current color in hex format (RGB display)
+    let bgr = settings.font_color & 0xffffff;
+    let hex = format!("#{:06X}", rgb_to_bgr(bgr));
+    SetWindowTextW(cw(IDC_FONT_COLOR), &HSTRING::from(&hex));
+    mk_static(hwnd, hi, 198, 420, 300, 17,
+        "Default value: #B7B7B7. Enter any hex color value (e.g. #FF0000).");
 
-    mk_static(hwnd, hi, 160, 530, 290, 20, "https://github.com/liq45/rust_flipit");
+    mk_static(hwnd, hi, 160, 450, 290, 20, "https://github.com/liq45/rust_flipit");
 }
 
 unsafe fn wide(s: &str) -> Vec<u16> { s.encode_utf16().chain(std::iter::once(0)).collect() }
 
-unsafe fn set_font_color(idx: usize) {
-    let colors: [u32; 7] = [0x00b7b7b7, 0x00ffffff, 0x0000ff00, 0x000000ff, 0x00ff0000, 0x00ffff00, 0x00cccccc];
-    if idx < 7 {
-        if let Some(s) = DIALOG_SETTINGS.as_mut() { (**s).font_color = colors[idx]; }
-    }
+/// Parse a hex color string like "#FF0000", "#ff0000", "FF0000", or "ff0000".
+/// Returns the color in RGB format (0x00RRGGBB). Returns None on invalid input.
+fn parse_hex_color(s: &str) -> Option<u32> {
+    let s = s.trim().trim_start_matches('#');
+    if s.len() != 6 { return None; }
+    u32::from_str_radix(s, 16).ok().map(|v| v & 0xffffff)
+}
+
+/// Convert RGB (0x00RRGGBB) to GDI BGR (0x00BBGGRR) — or vice versa (it's symmetric).
+fn rgb_to_bgr(c: u32) -> u32 {
+    let r = c & 0xff;
+    let g = (c >> 8) & 0xff;
+    let b = (c >> 16) & 0xff;
+    (r << 16) | (g << 8) | b
 }
 
 unsafe extern "system" fn settings_wndproc(
@@ -222,10 +208,14 @@ unsafe extern "system" fn settings_wndproc(
             match id {
                 IDC_OK => {
                     let pos = SendMessageW(cw(IDC_SCALE), 0x400, Some(WPARAM(0)), None).0 as i32;
-                    let alpha_pos = SendMessageW(cw(IDC_FONT_ALPHA), 0x400, Some(WPARAM(0)), None).0 as i32;
+                    // Read hex color from edit box
+                    let mut buf = [0u16; 128];
+                    let len = GetWindowTextW(cw(IDC_FONT_COLOR), &mut buf);
+                    let text = String::from_utf16_lossy(&buf[..len as usize]);
+                    let color = parse_hex_color(text.trim()).unwrap_or(0x00b7b7b7);
                     if let Some(s) = DIALOG_SETTINGS.as_mut() {
                         (**s).scale = pos * 10;
-                        (**s).font_alpha = (alpha_pos * 25).min(255) as u32;
+                        (**s).font_color = rgb_to_bgr(color);
                         (**s).save();
                     }
                     PostQuitMessage(0); LRESULT(0)
@@ -240,14 +230,6 @@ unsafe extern "system" fn settings_wndproc(
                     if let Some(s) = DIALOG_SETTINGS.as_mut() { (**s).show_dst = c; }
                     LRESULT(0)
                 }
-                IDC_FONT_COLOR0 => { set_font_color(0); LRESULT(0) }
-                IDC_FONT_COLOR1 => { set_font_color(1); LRESULT(0) }
-                IDC_FONT_COLOR2 => { set_font_color(2); LRESULT(0) }
-                IDC_FONT_COLOR3 => { set_font_color(3); LRESULT(0) }
-                IDC_FONT_COLOR4 => { set_font_color(4); LRESULT(0) }
-                IDC_FONT_COLOR5 => { set_font_color(5); LRESULT(0) }
-                IDC_FONT_COLOR6 => { set_font_color(6); LRESULT(0) }
-                IDC_FONT_ALPHA => { LRESULT(0) }
                 IDC_NOTHING | IDC_CURRENT_TIME | IDC_WORLD_TIME => {
                     let sel = SendMessageW(cw(IDC_SCREEN_LIST), 0x188, Some(WPARAM(0)), None).0 as usize;
                     if let Some(s) = DIALOG_SETTINGS.as_mut() {

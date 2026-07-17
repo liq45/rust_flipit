@@ -25,8 +25,7 @@ pub struct FlipItSettings {
     pub display_24h: bool,
     pub show_dst: bool,
     pub scale: i32,
-    pub font_color: u32,      // ARGB, default 0xffb7b7b7
-    pub font_alpha: u32,      // 0-255, default 255
+    pub font_color: u32,      // RGB (low 24 bits), default 0xffb7b7b7
     pub screen_settings: Vec<ScreenSetting>,
 }
 
@@ -50,7 +49,6 @@ impl FlipItSettings {
         let show_dst = ini.get_bool("General", "ShowDstIndicator", true);
         let scale = ini.get_int("General", "Scale", 100);
         let font_color = ini.get_int("General", "FontColor", 0x00b7b7b7) as u32;
-        let font_alpha = ini.get_int("General", "FontAlpha", 255) as u32;
 
         let mut screen_settings = Vec::new();
         for (num, device_name, w, h) in screen_devices {
@@ -71,7 +69,7 @@ impl FlipItSettings {
             }
             screen_settings.push(ss);
         }
-        Self { display_24h, show_dst, scale, font_color, font_alpha, screen_settings }
+        Self { display_24h, show_dst, scale, font_color, screen_settings }
     }
 
     pub fn save(&self) {
@@ -82,7 +80,6 @@ impl FlipItSettings {
         ini.set_bool("General", "ShowDstIndicator", self.show_dst);
         ini.set_int("General", "Scale", self.scale);
         ini.set_int("General", "FontColor", self.font_color as i32);
-        ini.set_int("General", "FontAlpha", self.font_alpha as i32);
         for screen in &self.screen_settings {
             let sec = format!("Screen {}", screen.device_name);
             ini.set_int(&sec, "DisplayType", screen.display_type as i32);
